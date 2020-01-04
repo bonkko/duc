@@ -1,3 +1,11 @@
+This is the fork of duc software from https://github.com/zevv/duc.
+
+It implement some minor features.
+
+It is not the main project.
+
+It follow the original readme.
+
 
 [![Build Status](https://travis-ci.org/zevv/duc.svg?branch=master)](https://travis-ci.org/zevv/duc)
 
