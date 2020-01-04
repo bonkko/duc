@@ -1,4 +1,3 @@
-
 #include "config.h"
 
 #include <limits.h>
@@ -240,10 +239,156 @@ static void ls_dir_only(const char *path, duc_dir *dir)
 }
 
 
+static int32_t is_file(const char *path)
+{
+	struct stat s;
+	
+	memset(&s,0x0,sizeof(struct stat));
+	if(stat(path,&s))
+		return 0;
+		
+    if(s.st_mode & S_IFREG)
+		return 1;
+		
+	return 0;
+}
+
+
+static void ls_one_file(duc_dir *dir,char * fileName)
+{
+	off_t max_size = 0;
+	size_t max_name_len = 0;
+	int max_size_len = 6;
+	duc_size_type st = opt_count ? DUC_SIZE_TYPE_COUNT : 
+	                   opt_apparent ? DUC_SIZE_TYPE_APPARENT : DUC_SIZE_TYPE_ACTUAL;
+	duc_sort sort = opt_name_sort ? DUC_SORT_NAME : DUC_SORT_SIZE;
+
+
+	char **tree = opt_ascii ? tree_ascii : tree_utf8;
+
+	/* Iterate the directory once to get maximum file size and name length */
+	
+	struct duc_dirent *e;
+	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
+
+		if(strcmp(e->name,fileName)!=0)
+			continue;
+			
+		off_t size = duc_get_size(&e->size, st);
+
+		if(size > max_size) max_size = size;
+		size_t l = string_width(e->name);
+		if(l > max_name_len) max_name_len = l;
+	}
+
+	if(opt_bytes) max_size_len = 12;
+	if(opt_classify) max_name_len ++;
+
+	/* Iterate a second time to print results */
+
+	duc_dir_rewind(dir);
+
+	size_t count = duc_dir_get_count(dir);
+	size_t n = 0;
+
+	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
+		
+		if(strcmp(e->name,fileName)!=0)
+			continue;
+
+		off_t size = duc_get_size(&e->size, st);
+
+		if(opt_recursive) {
+			if(n == 0)       prefix[0] = 1;
+			if(n >= 1)       prefix[0] = 2;
+			if(n == count-1) prefix[0] = 3;
+		}
+			
+		char *color_on = "";
+		char *color_off = "";
+
+		if(opt_color) {
+			color_off = COLOR_RESET;
+			if(size >= max_size / 8) color_on = COLOR_YELLOW;
+			if(size >= max_size / 2) color_on = COLOR_RED;
+		}
+
+		printf("%s", color_on);
+		char siz[32];
+		duc_human_size(&e->size, st, opt_bytes, siz, sizeof siz);
+		printf("%*s", max_size_len, siz);
+		printf("%s", color_off);
+
+		if(opt_recursive && !opt_full_path) {
+			int *p = prefix;
+			while(*p) printf("%s", tree[*p++]);
+		}
+
+		putchar(' ');
+		int32_t parent_path_len=0;
+		if(opt_full_path) {
+			printf("%s", parent_path);
+			parent_path_len += strlen(e->name) + 1;
+			if(parent_path_len + 1 < DUC_PATH_MAX) {
+				strcat(parent_path, e->name);
+				strcat(parent_path, "/");
+			}
+		}
+
+		size_t l = string_width(e->name) + 1;
+		
+		printf("%s", e->name);
+
+		if(opt_classify) {
+			putchar(duc_file_type_char(e->type));
+			l++;
+		}
+
+		if(opt_graph) {
+			for(;l<=max_name_len; l++) putchar(' ');
+			int w = width - max_name_len - max_size_len - 5;
+			w -=  4;
+			int l = max_size ? (w * size / max_size) : 0;
+			int j;
+			printf(" [%s", color_on);
+			for(j=0; j<l; j++) putchar('+');
+			for(; j<w; j++) putchar(' ');
+			printf("%s]", color_off);
+		}
+
+		putchar('\n');
+			
+		if(opt_recursive  && e->type == DUC_FILE_TYPE_DIR) {
+			if(n == count-1) {
+				prefix[0] = 5;
+			} else {
+				prefix[0] = 4;
+			}
+			duc_dir *dir2 = duc_dir_openent(dir, e);
+			if(dir2) {
+				ls_one(dir2, 1, parent_path_len);
+				duc_dir_close(dir2);
+			}
+		}
+
+		if(opt_full_path) {
+			parent_path_len -= strlen(e->name) + 1;
+			parent_path[parent_path_len] = '\0';
+		}
+		
+		n++;
+	}
+
+	prefix[0] = 0;
+}
+
 static void do_one(struct duc *duc, const char *path)
 {
+	char *name=NULL;
+	char *parent=NULL;
+	
 	duc_dir *dir = duc_dir_open(duc, path);
-	if(dir == NULL) {
+	if(dir == NULL && !is_file(path)) {
 		if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) {
 			duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
 			duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
@@ -251,6 +396,28 @@ static void do_one(struct duc *duc, const char *path)
 			duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
 		}
 		exit(1);
+	}
+	
+	if(is_file(path))
+	{
+		/*
+		parent=duc_malloc0(sizeof(path));
+		memcpy(parent,path,sizeof(path));
+		parent=dirname(parent);
+		dir=duc_dir_open(duc, parent);
+		name=duc_malloc0(sizeof(path));
+		memcpy(name,path,sizeof(path));
+		name=basename(path);
+		ls_one_file(dir,name);
+		duc_dir_close(dir);
+		return;*/
+		struct stat s;
+	
+		memset(&s,0x0,sizeof(struct stat));
+		stat(path,&s);
+		printf("%d %s\n",s.st_size,path);
+		return;
+		
 	}
 
 	if(opt_directory) {
