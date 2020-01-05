@@ -254,7 +254,7 @@ static int32_t is_file(const char *path)
 }
 
 
-static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len)
+static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t size_f)
 {
 	off_t max_size = 0;
 	size_t max_name_len = 0;
@@ -313,9 +313,7 @@ static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len)
 		}
 
 		printf("%s", color_on);
-		char siz[32];
-		duc_human_size(&e->size, st, opt_bytes, siz, sizeof siz);
-		printf("%*s", max_size_len, siz);
+		printf("%d",size_f);
 		printf("%s", color_off);
 
 		if(opt_recursive && !opt_full_path) {
@@ -419,8 +417,20 @@ static void do_one(struct duc *duc, const char *path)
 		memset(parent,0x0,index+1);
 		memcpy(parent,path,index);
 		dir=duc_dir_open(duc, parent);
-
-		ls_one_file(dir,name,index);
+		if(dir==NULL)
+		{
+			if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) {
+				duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
+				duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
+		 }else 
+			duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
+			
+		}
+		struct stat s;
+	
+		memset(&s,0x0,sizeof(struct stat));
+		stat(path,&s);
+		ls_one_file(dir,name,index,s.st_size);
 		duc_dir_close(dir);
 		return;
 		
