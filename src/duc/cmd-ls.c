@@ -254,7 +254,7 @@ static int32_t is_file(const char *path)
 }
 
 
-static void ls_one_file(duc_dir *dir,char * fileName)
+static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len)
 {
 	off_t max_size = 0;
 	size_t max_name_len = 0;
@@ -267,7 +267,6 @@ static void ls_one_file(duc_dir *dir,char * fileName)
 	char **tree = opt_ascii ? tree_ascii : tree_utf8;
 
 	/* Iterate the directory once to get maximum file size and name length */
-	
 	struct duc_dirent *e;
 	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
 
@@ -325,7 +324,7 @@ static void ls_one_file(duc_dir *dir,char * fileName)
 		}
 
 		putchar(' ');
-		int32_t parent_path_len=0;
+		int32_t parent_path_len=parent_len;
 		if(opt_full_path) {
 			printf("%s", parent_path);
 			parent_path_len += strlen(e->name) + 1;
@@ -400,22 +399,29 @@ static void do_one(struct duc *duc, const char *path)
 	
 	if(is_file(path))
 	{
-		/*
-		parent=duc_malloc0(sizeof(path));
-		memcpy(parent,path,sizeof(path));
-		parent=dirname(parent);
+		name=strdup(path);
+		name=basename(name);
+		if(name==NULL)
+		{
+			printf("parent check failed\n");
+			return;
+		}
+		uint32_t index=0;
+		char *p=NULL;
+		p=&path[0];
+		for(uint32_t i=0;i<strlen(path);i++)
+		{
+			p=&path[i];
+			if(*p=='/')
+				index=i;
+		}
+		parent=malloc(index+1);
+		memset(parent,0x0,index+1);
+		memcpy(parent,path,index);
 		dir=duc_dir_open(duc, parent);
-		name=duc_malloc0(sizeof(path));
-		memcpy(name,path,sizeof(path));
-		name=basename(path);
-		ls_one_file(dir,name);
+
+		ls_one_file(dir,name,index);
 		duc_dir_close(dir);
-		return;*/
-		struct stat s;
-	
-		memset(&s,0x0,sizeof(struct stat));
-		stat(path,&s);
-		printf("%d %s\n",s.st_size,path);
 		return;
 		
 	}
