@@ -374,22 +374,29 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
 			unit=malloc(2);
 			memset(unit,0x0,2);
 			
-			if(size_f < 1024*1024) 
+			if(size_f < 1024 && size_f > 0)
+			{
+				printf("%dB",size_f);
+			}
+			else if(size_f < 1024*1024) 
 			{
 				unit[0]='K';
 				ftoa(size_f/1024,4,buf);
+				printf("%s%s",buf,unit);
 			}
 			else if(size_f < 1024*1024*1024) 
 			{
 				unit[0]='M';
 				ftoa(size_f/(1024*1024),4,buf);
+				printf("%s%s",buf,unit);
 			}
 			else 
 			{
 				unit[0]='G';
 				ftoa(size_f/(1024*1024*1024),4,buf);
+				printf("%s%s",buf,unit);
 			}
-			printf("%s%s",buf,unit);
+			
 			free(unit);
 		}
 
