@@ -370,6 +370,7 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
 				ftoa(size_f/(1024*1024*1024),4,buf);
 			}
 			printf("%s%s",buf,unit);
+			free(unit);
 		}
 
 		if(opt_recursive && !opt_full_path) 
@@ -479,6 +480,7 @@ static void do_one(struct duc *duc, const char *path)
 		name=basename(name);
 		if(name==NULL)
 		{
+			free(parent);
 			printf("parent check failed\n");
 			exit(1);
 		}
@@ -487,6 +489,7 @@ static void do_one(struct duc *duc, const char *path)
 		stat(path,&s);
 		ls_one_file(dir,name,parent,index,s.st_size);
 		duc_dir_close(dir);
+		free(parent);
 		return;
 		
 	}
