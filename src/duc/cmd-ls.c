@@ -254,7 +254,54 @@ static int32_t is_file(const char *path)
 }
 
 
-static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t size_f)
+/* itoa_s and ftoa are imported from https://gist.github.com/Belgarion*/
+
+static int32_t itoa_s(int32_t value, char *buf) 
+{
+	int32_t index = 0;
+    int32_t i = value % 10;
+    
+    if (value >= 10) index += itoa_s(value / 10, buf);
+        
+    buf[index] = i+0x30;
+    index++;
+    return index;
+}
+
+static void ftoa(float value, int32_t decimals, char *buf) 
+{
+        int32_t index = 0;
+
+        if (value < 0) 
+        {
+			buf[index] = '-';
+            index++;
+            value = -value;
+        }
+        
+        // Rounding
+        float rounding = 0.5;
+        for (int32_t d = 0; d < decimals; rounding /= 10.0, d++);
+        value += rounding;
+
+        // Integer part
+        index += itoa_s((int)(value), buf+index);
+        buf[index++] = '.';
+
+        // Remove everything except the decimals
+        value = value - (int32_t)(value);
+
+        // Convert decmial part to integer
+        int32_t ival = 1;
+        for (int32_t d = 0; d < decimals; ival *= 10, d++);
+        ival *= value;
+
+        // Add decimal part to string
+        index += itoa_s(ival, buf+index);
+        buf[index] = '\0';
+}
+
+static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t parent_len,int32_t size_f)
 {
 	off_t max_size = 0;
 	size_t max_name_len = 0;
@@ -280,9 +327,6 @@ static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t 
 		if(l > max_name_len) max_name_len = l;
 	}
 
-	if(opt_bytes) max_size_len = 12;
-	if(opt_classify) max_name_len ++;
-
 	/* Iterate a second time to print results */
 
 	duc_dir_rewind(dir);
@@ -290,67 +334,78 @@ static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t 
 	size_t count = duc_dir_get_count(dir);
 	size_t n = 0;
 
-	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
+	while( (e = duc_dir_read(dir, st, sort)) != NULL) 
+	{
 		
 		if(strcmp(e->name,fileName)!=0)
 			continue;
 
 		off_t size = duc_get_size(&e->size, st);
 
-		if(opt_recursive) {
-			if(n == 0)       prefix[0] = 1;
-			if(n >= 1)       prefix[0] = 2;
-			if(n == count-1) prefix[0] = 3;
-		}
+		if(opt_bytes)
+			printf("%d",size_f);
+		else
+		{
+			char buf[1024];
+			float f=0.0f;
+			char *unit=NULL;
 			
-		char *color_on = "";
-		char *color_off = "";
-
-		if(opt_color) {
-			color_off = COLOR_RESET;
-			if(size >= max_size / 8) color_on = COLOR_YELLOW;
-			if(size >= max_size / 2) color_on = COLOR_RED;
+			memset(buf,0x0,1024);
+			unit=malloc(2);
+			memset(unit,0x0,2);
+			
+			if(size_f < 1024*1024) 
+			{
+				unit[0]='K';
+				ftoa(size_f/1024,4,buf);
+			}
+			else if(size_f < 1024*1024*1024) 
+			{
+				unit[0]='M';
+				ftoa(size_f/(1024*1024),4,buf);
+			}
+			else 
+			{
+				unit[0]='G';
+				ftoa(size_f/(1024*1024*1024),4,buf);
+			}
+			printf("%s%s",buf,unit);
 		}
 
-		printf("%s", color_on);
-		printf("%d",size_f);
-		printf("%s", color_off);
-
-		if(opt_recursive && !opt_full_path) {
+		if(opt_recursive && !opt_full_path) 
+		{
 			int *p = prefix;
 			while(*p) printf("%s", tree[*p++]);
 		}
 
 		putchar(' ');
-		int32_t parent_path_len=parent_len;
-		if(opt_full_path) {
-			printf("%s", parent_path);
-			parent_path_len += strlen(e->name) + 1;
-			if(parent_path_len + 1 < DUC_PATH_MAX) {
-				strcat(parent_path, e->name);
-				strcat(parent_path, "/");
-			}
-		}
+		if(opt_directory) 
+			printf("%s/%s", parent_name,e->name);
+		else
+			printf("%s", e->name);
+		
+		fflush(stdout);
 
 		size_t l = string_width(e->name) + 1;
 		
-		printf("%s", e->name);
+		
 
 		if(opt_classify) {
 			putchar(duc_file_type_char(e->type));
 			l++;
 		}
 
-		if(opt_graph) {
+		if(opt_graph) 
+		{
 			for(;l<=max_name_len; l++) putchar(' ');
 			int w = width - max_name_len - max_size_len - 5;
 			w -=  4;
 			int l = max_size ? (w * size / max_size) : 0;
 			int j;
-			printf(" [%s", color_on);
+			printf(" [");
 			for(j=0; j<l; j++) putchar('+');
 			for(; j<w; j++) putchar(' ');
-			printf("%s]", color_off);
+			printf("]");
 		}
 
 		putchar('\n');
@@ -363,14 +418,9 @@ static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t 
 			}
 			duc_dir *dir2 = duc_dir_openent(dir, e);
 			if(dir2) {
-				ls_one(dir2, 1, parent_path_len);
+				ls_one(dir2, 1, strlen(parent_path));
 				duc_dir_close(dir2);
 			}
-		}
-
-		if(opt_full_path) {
-			parent_path_len -= strlen(e->name) + 1;
-			parent_path[parent_path_len] = '\0';
 		}
 		
 		n++;
@@ -379,60 +429,63 @@ static void ls_one_file(duc_dir *dir,char * fileName,int32_t parent_len,int32_t 
 	prefix[0] = 0;
 }
 
+static no_in_db_error(struct duc *duc,const char *path)
+{
+	if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) 
+	{
+		if(!is_file(path))
+			duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
+		else
+			duc_log(duc, DUC_LOG_FTL, "The requested file '%s' was not found in the database,", path);
+			
+		duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
+	} 
+	else 
+		duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
+		
+	exit(1);
+}
+
 static void do_one(struct duc *duc, const char *path)
 {
 	char *name=NULL;
 	char *parent=NULL;
+	struct stat s;
+	uint32_t index=0;
+	char *p=NULL;
+	uint32_t i=0;
+	
 	
 	duc_dir *dir = duc_dir_open(duc, path);
-	if(dir == NULL && !is_file(path)) {
-		if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) {
-			duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
-			duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
-		} else {
-			duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
-		}
-		exit(1);
-	}
+	if(dir == NULL && !is_file(path)) 
+		no_in_db_error(duc,path);
 	
 	if(is_file(path))
-	{
+	{	
+		p=&path[0];
+		for(i=0;i<strlen(path);i++)
+		{
+			if(*p=='/')
+				index=i;
+			p++;
+		}
+		parent=malloc(index+1);
+		memset(parent,0x0,index+1);
+		memcpy(parent,path,index);
+		if((dir=duc_dir_open(duc, parent))==NULL)
+			no_in_db_error(duc,path);
+		
 		name=strdup(path);
 		name=basename(name);
 		if(name==NULL)
 		{
 			printf("parent check failed\n");
-			return;
+			exit(1);
 		}
-		uint32_t index=0;
-		char *p=NULL;
-		p=&path[0];
-		for(uint32_t i=0;i<strlen(path);i++)
-		{
-			p=&path[i];
-			if(*p=='/')
-				index=i;
-		}
-		parent=malloc(index+1);
-		memset(parent,0x0,index+1);
-		memcpy(parent,path,index);
-		dir=duc_dir_open(duc, parent);
-		if(dir==NULL)
-		{
-			if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) {
-				duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
-				duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
-		 }else 
-			duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
-		
-			return;
-			
-		}
-		struct stat s;
-	
+
 		memset(&s,0x0,sizeof(struct stat));
 		stat(path,&s);
-		ls_one_file(dir,name,index,s.st_size);
+		ls_one_file(dir,name,parent,index,s.st_size);
 		duc_dir_close(dir);
 		return;
 		
@@ -507,7 +560,7 @@ static struct ducrc_option options[] = {
 	{ &opt_color,     "color",     'c', DUCRC_TYPE_BOOL,   "colorize output (only on ttys)" },
 	{ &opt_count,     "count",      0,  DUCRC_TYPE_BOOL,   "show number of files instead of file size" },
 	{ &opt_database,  "database",  'd', DUCRC_TYPE_STRING, "select database file to use [~/.duc.db]" },
-	{ &opt_directory, "directory", 'D', DUCRC_TYPE_BOOL,   "list directory itself, not its contents" },
+	{ &opt_directory, "directory", 'D', DUCRC_TYPE_BOOL,   "show path , not its contents" },
 	{ &opt_dirs_only, "dirs-only",  0,  DUCRC_TYPE_BOOL,   "list only directories, skip individual files" },
 	{ &opt_full_path, "full-path",  0,  DUCRC_TYPE_BOOL,   "show full path instead of tree in recursive view" },
 	{ &opt_graph,     "graph",     'g', DUCRC_TYPE_BOOL,   "draw graph with relative size for each entry" },
