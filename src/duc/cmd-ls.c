@@ -424,6 +424,8 @@ static void do_one(struct duc *duc, const char *path)
 				duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
 		 }else 
 			duc_log(duc, DUC_LOG_FTL, "%s", duc_strerror(duc));
+		
+			return;
 			
 		}
 		struct stat s;
