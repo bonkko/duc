@@ -1,3 +1,12 @@
+/* Original Authors https://github.com/zevv/duc
+ * ORIGINAL LICENSE GPL V3.0
+ * 
+ * Modified Version
+ * 2020 5 Jan Matteo Bonicolini (matteo.bonicolini@gmail.com)
+ * 
+ * LICENSE: LGPL V3.0
+ * */
+
 #include "config.h"
 
 #include <limits.h>
@@ -239,6 +248,10 @@ static void ls_dir_only(const char *path, duc_dir *dir)
 }
 
 
+
+/* auxiliary function added by Matteo Bonicolini LGPL V3.0
+ * Check if path is a file
+ * */
 static int32_t is_file(const char *path)
 {
 	struct stat s;
@@ -254,7 +267,8 @@ static int32_t is_file(const char *path)
 }
 
 
-/* itoa_s and ftoa are imported from https://gist.github.com/Belgarion*/
+/* itoa_s and ftoa are imported from https://gist.github.com/Belgarion
+ * */
 
 static int32_t itoa_s(int32_t value, char *buf) 
 {
@@ -301,6 +315,11 @@ static void ftoa(float value, int32_t decimals, char *buf)
         buf[index] = '\0';
 }
 
+
+
+/* auxiliary function added by Matteo Bonicolini LGPL V3.0
+ * It make print with stat for file
+ * */
 static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t parent_len,int32_t size_f)
 {
 	off_t max_size = 0;
@@ -315,7 +334,8 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
 
 	/* Iterate the directory once to get maximum file size and name length */
 	struct duc_dirent *e;
-	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
+	while( (e = duc_dir_read(dir, st, sort)) != NULL) 
+	{
 
 		if(strcmp(e->name,fileName)!=0)
 			continue;
@@ -430,6 +450,12 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
 	prefix[0] = 0;
 }
 
+
+/* modified version by Matteo Bonicolini 
+ * LGPL V3.0
+ * 
+ * Print an error msg for invalid path and exit with return status 1
+ * */
 static no_in_db_error(struct duc *duc,const char *path)
 {
 	if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) 
@@ -447,6 +473,10 @@ static no_in_db_error(struct duc *duc,const char *path)
 	exit(1);
 }
 
+/* modified version of auxiliary function added by Matteo Bonicolini 
+ * LGPL V3.0
+ * 
+ * It is the core of the cmd-ls*/
 static void do_one(struct duc *duc, const char *path)
 {
 	char *name=NULL;
