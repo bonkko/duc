@@ -1,7 +1,9 @@
-This is the fork of duc software from https://github.com/zevv/duc.
+**This is a duc software fork from https://github.com/zevv/duc.**
+**I'm not a developer of the duc project.**
 
-It implement some minor features on cmd-ls.c and it is not the main project.
-Below the original readme.
+The fork implement some minor features on cmd-ls.c and unit test with check and pytest.
+
+**Below the original readme.**
 
 [![Build Status](https://travis-ci.org/zevv/duc.svg?branch=master)](https://travis-ci.org/zevv/duc)
 
