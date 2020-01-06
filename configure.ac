@@ -182,7 +182,6 @@ AM_CONDITIONAL([ENABLE_UI], [test "$enable_ui" = "true"])
 AM_CONDITIONAL([ENABLE_X11], [test "$enable_x11" = "true"])
 
 AC_MSG_RESULT([
-
   configuration summary:
   
    - Package version: $PACKAGE $VERSION
@@ -192,8 +191,6 @@ AC_MSG_RESULT([
    - OpenGL support: ${enable_opengl}
    - UI (ncurses) support: ${enable_ui}
    - Graph cairo support: ${enable_cairo}
-
 ])
 
 # End
-

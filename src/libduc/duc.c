@@ -18,6 +18,8 @@
 #include "db.h"
 
 
+
+
 static void default_log_callback(duc_log_level level, const char *fmt, va_list va)
 {
 	vfprintf(stderr, fmt, va);

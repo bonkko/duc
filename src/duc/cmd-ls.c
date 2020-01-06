@@ -463,7 +463,7 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
  * 
  * Print an error msg for invalid path and exit with return status 1
  * */
-static no_in_db_error(struct duc *duc,const char *path)
+static void no_in_db_error(struct duc *duc,const char *path)
 {
 	if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) 
 	{
