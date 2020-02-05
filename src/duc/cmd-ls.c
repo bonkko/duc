@@ -52,6 +52,7 @@ static char *tree_utf8[] = {
 	"    ",
 };
 
+
 static bool opt_apparent = false;
 static bool opt_count = false;
 static bool opt_ascii = false;
@@ -360,45 +361,11 @@ static void ls_one_file(duc_dir *dir,char * fileName,char* parent_name,int32_t p
 		if(strcmp(e->name,fileName)!=0)
 			continue;
 
+		char siz[32];
+		duc_human_size(&e->size, st, opt_bytes, siz, 32);
 		off_t size = duc_get_size(&e->size, st);
-
-		if(opt_bytes)
-			printf("%d",size_f);
-		else
-		{
-			char buf[1024];
-			float f=0.0f;
-			char *unit=NULL;
-			
-			memset(buf,0x0,1024);
-			unit=malloc(2);
-			memset(unit,0x0,2);
-			
-			if(size_f < 1024 && size_f > 0)
-			{
-				printf("%dB",size_f);
-			}
-			else if(size_f < 1024*1024) 
-			{
-				unit[0]='K';
-				ftoa(size_f/1024,4,buf);
-				printf("%s%s",buf,unit);
-			}
-			else if(size_f < 1024*1024*1024) 
-			{
-				unit[0]='M';
-				ftoa(size_f/(1024*1024),4,buf);
-				printf("%s%s",buf,unit);
-			}
-			else 
-			{
-				unit[0]='G';
-				ftoa(size_f/(1024*1024*1024),4,buf);
-				printf("%s%s",buf,unit);
-			}
-			
-			free(unit);
-		}
+		printf("%s",siz);
+		
 
 		if(opt_recursive && !opt_full_path) 
 		{
@@ -480,6 +447,105 @@ static void no_in_db_error(struct duc *duc,const char *path)
 	exit(1);
 }
 
+
+struct inode
+{
+        struct inode* next;
+        char * item;
+};
+
+typedef struct inode node;
+
+static node* newNode()
+{
+	node *ret=NULL;
+	
+	ret=(node*) malloc(sizeof(node));
+	if(ret==NULL) return NULL;
+	
+	ret->next=NULL;
+	ret->item=NULL;
+	
+	return ret;
+}
+
+
+static int isNULLnode(node **p)
+{
+	if(p==NULL || *p==NULL)
+		return 1;
+	else
+		return 0;
+}
+
+static int emptyNode(node **p)
+{
+
+	if((*p)->next==NULL && (*p)->item==NULL)
+		return 1;
+	else
+		return 0;
+	
+}
+
+static int addFIFO(node **tail,char*item)
+{
+	node *tmp=NULL;
+	node *p=NULL;
+	
+	if(isNULLnode(tail))
+		return 1;
+	
+	if(emptyNode(tail))
+	{
+		(*tail)->item=item;
+		(*tail)->next=*tail;
+	}
+	else
+	{			
+		tmp=*tail;
+		p=newNode();
+		p->item=item;
+		p->next=tmp->next;
+		tmp->next=p;
+		(*tail)=p;
+	}
+	
+	return 0;
+}
+
+static void* delFIFO(node **tail)
+{
+	node *tmp=NULL;
+	void *ret=NULL;
+	
+	if(isNULLnode(tail)) 
+		return NULL;
+	
+	if(emptyNode(tail))
+	{
+		free(*tail);
+		*tail=NULL;
+		return NULL;
+	}
+	tmp=(*tail)->next;
+	tmp=(*tail)->next;
+	if(tmp==*tail)
+		*tail=NULL;
+	else
+		(*tail)->next=tmp->next;
+		
+	tmp->next=NULL;
+	ret=tmp->item;
+	tmp->item=NULL;
+	free(tmp);
+	
+	return ret;
+}
+
+node *path_error_queue=NULL;
+
+
 /* modified version of auxiliary function added by Matteo Bonicolini 
  * LGPL V3.0
  * 
@@ -490,13 +556,15 @@ static void do_one(struct duc *duc, const char *path)
 	char *parent=NULL;
 	struct stat s;
 	uint32_t index=0;
-	char *p=NULL;
+	const char *p;
 	uint32_t i=0;
 	
-	
 	duc_dir *dir = duc_dir_open(duc, path);
-	if(dir == NULL && !is_file(path)) 
-		no_in_db_error(duc,path);
+	if(dir == NULL && !is_file(path))
+	{
+		addFIFO(&path_error_queue,(char*)path);
+		return;
+	}
 	
 	if(is_file(path))
 	{	
@@ -544,7 +612,7 @@ static void do_one(struct duc *duc, const char *path)
 static int ls_main(duc *duc, int argc, char **argv)
 {
 	/* Get terminal width */
-
+	char *path_error_elem=NULL;
 #ifdef TIOCGWINSZ
 	if(isatty(STDOUT_FILENO)) {
 		struct winsize w;
@@ -576,7 +644,8 @@ static int ls_main(duc *duc, int argc, char **argv)
 	if(r != DUC_OK) {
 		return -1;
 	}
-
+	
+	path_error_queue=newNode();
 	if(argc > 0) {
 		int i;
 		for(i=0; i<argc; i++) {
@@ -585,7 +654,24 @@ static int ls_main(duc *duc, int argc, char **argv)
 	} else {
 		do_one(duc, ".");
 	}
-
+	
+	if(isNULLnode(&path_error_queue))
+	{
+		duc_close(duc);
+		return 0;
+	}
+	
+	while(!emptyNode(&path_error_queue))
+	{
+		path_error_elem=delFIFO(&path_error_queue);
+		if(!is_file(path_error_elem))
+			printf("The requested path '%s' was not found in the database,\n", path_error_elem);
+		else
+			printf("The requested file '%s' was not found in the database,\n", path_error_elem);
+			
+		printf("Please run 'duc info' for a list of available directories.\n");
+		fflush(stdout);
+	}
 	duc_close(duc);
 
 	return 0;
