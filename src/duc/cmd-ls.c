@@ -108,7 +108,7 @@ static void ls_one(duc_dir *dir, int level, size_t parent_path_len)
 	                   opt_apparent ? DUC_SIZE_TYPE_APPARENT : DUC_SIZE_TYPE_ACTUAL;
 	duc_sort sort = opt_name_sort ? DUC_SORT_NAME : DUC_SORT_SIZE;
 
-	if(level > opt_levels) return;
+	//if(level > opt_levels) return;
 
 	char **tree = opt_ascii ? tree_ascii : tree_utf8;
 
@@ -135,7 +135,6 @@ static void ls_one(duc_dir *dir, int level, size_t parent_path_len)
 	size_t n = 0;
 
 	while( (e = duc_dir_read(dir, st, sort)) != NULL) {
-
 		if(opt_dirs_only && e->type != DUC_FILE_TYPE_DIR) continue;
 
 		off_t size = duc_get_size(&e->size, st);
@@ -434,10 +433,7 @@ static void no_in_db_error(struct duc *duc,const char *path)
 {
 	if(duc_error(duc) == DUC_E_PATH_NOT_FOUND) 
 	{
-		if(!is_file(path))
-			duc_log(duc, DUC_LOG_FTL, "The requested path '%s' was not found in the database,", path);
-		else
-			duc_log(duc, DUC_LOG_FTL, "The requested file '%s' was not found in the database,", path);
+		duc_log(duc, DUC_LOG_FTL, "The requested file '%s' was not found in the database,", path);
 			
 		duc_log(duc, DUC_LOG_FTL, "Please run 'duc info' for a list of available directories.");
 	} 
@@ -562,6 +558,34 @@ static void do_one(struct duc *duc, const char *path)
 	duc_dir *dir = duc_dir_open(duc, path);
 	if(dir == NULL && !is_file(path))
 	{
+				p=&path[0];
+		for(i=0;i<strlen(path);i++)
+		{
+			if(*p=='/')
+				index=i;
+			p++;
+		}
+		parent=malloc(index+1);
+		memset(parent,0x0,index+1);
+		memcpy(parent,path,index);
+		if((dir=duc_dir_open(duc, parent))==NULL)
+		{
+			no_in_db_error(duc,path);
+		}
+		
+		name=strdup(path);
+		name=basename(name);
+		if(name==NULL)
+		{
+			free(parent);
+			printf("parent check failed\n");
+			exit(1);
+		}
+
+		memset(&s,0x0,sizeof(struct stat));
+		stat(path,&s);
+		ls_one_file(dir,name,parent,index,s.st_size);
+		duc_dir_close(dir);
 		addFIFO(&path_error_queue,(char*)path);
 		return;
 	}
@@ -579,7 +603,9 @@ static void do_one(struct duc *duc, const char *path)
 		memset(parent,0x0,index+1);
 		memcpy(parent,path,index);
 		if((dir=duc_dir_open(duc, parent))==NULL)
+		{
 			no_in_db_error(duc,path);
+		}
 		
 		name=strdup(path);
 		name=basename(name);
@@ -661,7 +687,7 @@ static int ls_main(duc *duc, int argc, char **argv)
 		return 0;
 	}
 	
-	while(!emptyNode(&path_error_queue))
+	/*while(!emptyNode(&path_error_queue))
 	{
 		path_error_elem=delFIFO(&path_error_queue);
 		if(!is_file(path_error_elem))
@@ -671,7 +697,7 @@ static int ls_main(duc *duc, int argc, char **argv)
 			
 		printf("Please run 'duc info' for a list of available directories.\n");
 		fflush(stdout);
-	}
+	}*/
 	duc_close(duc);
 
 	return 0;

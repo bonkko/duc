@@ -167,7 +167,7 @@ START_TEST(ls_cmd)
 	ck_assert_ptr_null(ret=call_cmd(NULL));
 	ck_assert_ptr_nonnull(ret=call_cmd(&cmd_ls));
 	ck_assert_int_eq(strlen(ret),8);
-	ck_assert_str_eq(ret,"2 a.txt\n");
+	ck_assert_str_eq(ret,"0 a.txt\n");
 }
 END_TEST
  
